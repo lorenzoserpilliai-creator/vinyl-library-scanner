@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Vinyl Scanner</title>
+
+  <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #000;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: auto;
+      padding: 24px 20px 40px;
+    }
+
+    h1 {
+      font-size: 32px;
+      margin: 10px 0 8px;
+    }
+
+    .subtitle {
+      color: #aaa;
+      margin-bottom: 25px;
+      line-height: 1.4;
+    }
+
+    .scanner {
+      position: relative;
+      width: 100%;
+      border-radius: 22px;
+      overflow: hidden;
+      background: #151515;
+      aspect-ratio: 3 / 4;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .frame {
+      position: absolute;
+      left: 8%;
+      right: 8%;
+      top: 38%;
+      height: 24%;
+      border: 3px solid white;
+      border-radius: 18px;
+      pointer-events: none;
+    }
+
+    .line {
+      position: absolute;
+      left: 12%;
+      right: 12%;
+      top: 50%;
+      height: 2px;
+      background: white;
+      opacity: .8;
+    }
+
+    .status {
+      margin-top: 18px;
+      padding: 16px;
+      background: #171717;
+      border-radius: 16px;
+      text-align: center;
+      font-size: 17px;
+    }
+
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 16px;
+      padding: 17px;
+      font-size: 18px;
+      font-weight: 700;
+      margin-top: 14px;
+      cursor: pointer;
+    }
+
+    .primary {
+      background: white;
+      color: black;
+    }
+
+    .secondary {
+      background: #222;
+      color: white;
+    }
+
+    .code {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      margin-top: 8px;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <h1>💿 Vinyl Scanner</h1>
+
+  <div class="subtitle">
+    Inquadra il codice a barre del vinile.
+  </div>
+
+  <div class="scanner">
+    <video id="video" playsinline muted></video>
+    <div class="frame"></div>
+    <div class="line"></div>
+  </div>
+
+  <div id="status" class="status">
+    Premi “Avvia fotocamera”
+  </div>
+
+  <div id="resultBox" class="status hidden">
+    Barcode trovato
+    <div id="barcodeResult" class="code"></div>
+  </div>
+
+  <button id="startButton" class="primary" onclick="startScanner()">
+    📷 Avvia fotocamera
+  </button>
+
+  <button id="scanAgainButton"
+          class="secondary hidden"
+          onclick="startScanner()">
+    Scansiona un altro disco
+  </button>
+
+</div>
+
+<script>
+
+let codeReader = null;
+let scanning = false;
+
+async function startScanner() {
+
+  const status = document.getElementById('status');
+  const resultBox = document.getElementById('resultBox');
+  const startButton = document.getElementById('startButton');
+  const scanAgainButton = document.getElementById('scanAgainButton');
+
+  resultBox.classList.add('hidden');
+  scanAgainButton.classList.add('hidden');
+
+  status.innerHTML = 'Apertura fotocamera…';
+
+  try {
+
+    if (!window.ZXing) {
+      throw new Error('Lettore barcode non caricato.');
+    }
+
+    if (codeReader) {
+      codeReader.reset();
+    }
+
+    codeReader = new ZXing.BrowserMultiFormatReader();
+    scanning = true;
+
+    await codeReader.decodeFromConstraints(
+      {
+        audio: false,
+        video: {
+          facingMode: {
+            ideal: 'environment'
+          }
+        }
+      },
+
+      document.getElementById('video'),
+
+      function(result, error) {
+
+        if (!scanning) return;
+
+        if (result) {
+
+          scanning = false;
+
+          const barcode = result.getText();
+
+          document.getElementById('barcodeResult').textContent = barcode;
+
+          resultBox.classList.remove('hidden');
+
+          status.innerHTML = '✅ Codice letto correttamente';
+
+          startButton.classList.add('hidden');
+          scanAgainButton.classList.remove('hidden');
+
+          if (codeReader) {
+            codeReader.reset();
+          }
+
+          // Se Vinyl Library ci ha passato il suo indirizzo,
+          // restituiamo automaticamente il barcode.
+          const params = new URLSearchParams(window.location.search);
+          const returnUrl = params.get('return');
+
+          if (returnUrl) {
+
+            setTimeout(function() {
+
+              const separator =
+                returnUrl.includes('?') ? '&' : '?';
+
+              window.location.href =
+                returnUrl +
+                separator +
+                'barcode=' +
+                encodeURIComponent(barcode);
+
+            }, 700);
+
+          }
+
+        }
+
+      }
+    );
+
+    status.innerHTML =
+      '📷 Fotocamera attiva — inquadra il barcode';
+
+  }
+
+  catch(error) {
+
+    console.error(error);
+
+    status.innerHTML =
+      '❌ Non riesco ad aprire la fotocamera.<br><br>' +
+      (error.message || error);
+
+  }
+
+}
+
+</script>
+
+</body>
+</html>
